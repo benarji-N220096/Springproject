@@ -1,0 +1,77 @@
+================================================================================
+COMPLETE JWT SECURITY EXECUTION FLOW (PHASE 1 TO 6)
+================================================================================
+
+--------------------------------------------------------------------------------
+PART 1: THE COMPONENTS ("WHAT IS WHAT")
+--------------------------------------------------------------------------------
+1. SecurityConfig: The Rulebook. It tells Spring which URLs are public (register/login) and which are private. It also turns off sessions (STATELESS) and registers our custom filter.
+2. JwtAuthenticationFilter: The Security Guard. It intercepts every single HTTP request to check if a valid JWT token exists in the header before allowing the request to reach the Controller.
+3. JwtService: The Token Factory & Mathematician. It generates new tokens (Access & Refresh), signs them with a Secret Key, and decodes incoming tokens to verify they are not fake or expired.
+4. CustomUserDetailsService: The Database Fetcher. Spring Security uses this to load user details and Roles from MySQL using the username extracted from the token.
+5. AuthService: The Business Logic layer. Handles the actual work of registering users into the database and verifying passwords during login.
+6. AuthController: The Doorway. Exposes the /api/auth/login, /register, and /refresh API endpoints to the outside world.
+7. GlobalExceptionHandler: The Diplomat. Catches errors like "Expired Token" or "Bad Password" and returns clean JSON error messages instead of crashing the server.
+
+--------------------------------------------------------------------------------
+PART 2: POINT-TO-POINT EXECUTION FLOWS
+--------------------------------------------------------------------------------
+
+FLOW 1: USER REGISTRATION
+Goal: Create a new user in the database.
+1. Client sends POST request to /api/auth/register with username, email, password, and role.
+2. Request hits AuthController.register().
+3. AuthController passes data to AuthService.register().
+4. AuthService checks if the username or email already exists in the UserRepository.
+5. AuthService uses BCryptPasswordEncoder to scramble (hash) the raw password.
+6. AuthService saves the new User entity to the MySQL database.
+7. Server responds with "User registered successfully!".
+
+---
+
+FLOW 2: USER LOGIN (GENERATING TOKENS)
+Goal: Verify identity and issue JWT tokens.
+1. Client sends POST request to /api/auth/login with username and password.
+2. Request hits AuthController.login().
+3. AuthController passes data to AuthService.login().
+4. AuthService hands the raw credentials to Spring's AuthenticationManager.
+5. AuthenticationManager compares the raw password with the hashed password in the database. (If it fails, GlobalExceptionHandler returns 401 Bad Credentials).
+6. Because credentials match, AuthService calls JwtService to generate two tokens:
+   - Access Token (Valid for 15 minutes)
+   - Refresh Token (Valid for 7 days)
+7. AuthService packages both tokens into an AuthResponse DTO.
+8. Server sends the AuthResponse (JSON) back to the client.
+
+---
+
+FLOW 3: AUTHORIZATION (ACCESSING PROTECTED DATA)
+Goal: Access an endpoint that requires the ADMIN role.
+1. Client wants to fetch employees. They send GET request to /api/employees.
+2. Crucial Step: The client attaches the header: "Authorization: Bearer <Access_Token>".
+3. Request is intercepted by JwtAuthenticationFilter.
+4. Filter strips "Bearer " and hands the raw token to JwtService.
+5. JwtService does cryptographic math to verify the signature and checks if it's expired.
+6. JwtService extracts the username from the valid token.
+7. Filter calls CustomUserDetailsService to load that user's roles from the database (e.g., ADMIN).
+8. Filter creates a trusted Authentication object and puts it into the SecurityContextHolder. Spring now "remembers" the user for the next millisecond.
+9. Request leaves the filter and reaches EmployeeController.getAllEmployees().
+10. Spring reads the @PreAuthorize("hasAuthority('ADMIN')") annotation.
+11. Spring checks the SecurityContextHolder, sees the user is an ADMIN, and grants access.
+12. EmployeeController fetches data from the database and returns it.
+13. Request ends, SecurityContextHolder is wiped clean (Stateless).
+
+---
+
+FLOW 4: REFRESHING AN EXPIRED TOKEN
+Goal: Get a new Access Token without logging in again.
+1. Client tries Flow 3, but their Access Token is 16 minutes old.
+2. JwtAuthenticationFilter detects it is expired and throws ExpiredJwtException.
+3. GlobalExceptionHandler catches it and returns 401 Unauthorized "JWT token has expired".
+4. The client (e.g., a React frontend) silently catches this 401 error.
+5. Client sends POST request to /api/auth/refresh with the long-lived Refresh Token in the body.
+6. Request hits AuthController.refresh().
+7. AuthController passes the refresh token to AuthService.refreshToken().
+8. AuthService uses JwtService to mathematically validate the Refresh Token and extract the username.
+9. AuthService generates a brand new Access Token for that username.
+10. Server sends the new Access Token back to the client.
+11. Client retries Flow 3 using the new Access Token, and it succeeds!
