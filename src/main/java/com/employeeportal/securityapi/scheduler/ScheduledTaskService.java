@@ -32,7 +32,7 @@ public class ScheduledTaskService {
      * In a real app, you would use a cron expression for a daily schedule, e.g.,
      * @Scheduled(cron = "0 0 9 * * ?") // Every day at 9 AM
      */
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 600000)
     public void generateDailyEmployeeReport() {
         logger.info("Scheduler triggered on thread: {}", Thread.currentThread().getName());
         

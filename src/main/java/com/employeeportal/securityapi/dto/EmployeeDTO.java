@@ -20,4 +20,8 @@ public class EmployeeDTO {
 
     @Positive(message = "Salary must be positive")
     private Double salary;
+
+    // File Metadata for Response
+    private String profileImageName;
+    private String resumeName;
 }

@@ -50,8 +50,8 @@ public class EmailService {
         String subject = "Daily Employee Report";
         String body = "The total number of employees in the system is: " + totalEmployees;
         
-        // Use a placeholder admin email since we don't have a specific admin email configured
-        sendEmail("admin@employeeportal.com", subject, body);
+        // Use the configured admin email for the daily report
+        sendEmail("n220096@rguktn.ac.in", subject, body);
         
         logger.info("Async admin report email task completed on thread: {}", Thread.currentThread().getName());
     }

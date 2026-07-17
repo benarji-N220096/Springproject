@@ -28,6 +28,13 @@ public class Employee {
     @Column(nullable = false)
     private Double salary;
 
-    // Optional: Link to User if needed, but the prompt says 2 entities.
-    // I'll keep them separate as per prompt requirements.
+    // Profile Image Metadata
+    private String profileImageName;
+    private String profileImagePath;
+    private String profileImageType;
+
+    // Resume Metadata
+    private String resumeName;
+    private String resumePath;
+    private String resumeType;
 }
